@@ -57,7 +57,7 @@ void record();
 void replay();
 void help();
 void echo(char **args, launchType t);
-void mypid(char **args);
+void mypid(char **args, launchType t);
 
 void push(char *input);
 shellCommand newCommand(char *input);
@@ -68,9 +68,11 @@ element *front = NULL;
 element *rear = NULL;
 int queueSize = 0;
 
+pid_t shell_pid;
+
 int main()
 {
-
+	shell_pid = getpid();
 	printf("=================================================\n");
 	printf("*Welcome to my shell                            *\n");
 	printf("*                                               *\n");
@@ -308,7 +310,7 @@ void launch(char **args, launchType t, int i)
 		case 6:
 			break;
 		case 7:
-			mypid(args);
+			mypid(args, t);
 			break;
 		}
 		exit(EXIT_SUCCESS);
@@ -522,11 +524,14 @@ void echo(char **args, launchType t)
 		printf("\n");
 }
 
-void mypid(char **args)
+void mypid(char **args, launchType t)
 {
 	if (!strcmp(args[1], "-i"))
 	{
-		execlp("pidof", "pidof", "my_shell", NULL);
+		if (!t.background)
+			printf("%d\n", shell_pid);
+		else
+			printf("%d\n", getpid());
 	}
 	else if (!strcmp(args[1], "-p"))
 	{
@@ -536,17 +541,17 @@ void mypid(char **args)
 		strncpy(loc + 6 + strlen(args[2]), "/status\0", 8);
 
 		char *com[] = {"grep", "PPid", loc, NULL, "cut", "-f2", NULL};
-		launchType t;
-		t.pipeNum = 1;
-		t.pipeLoc[0] = 4;
-		t.background = false;
-		for (int i = 0; i <= t.pipeNum; i++)
+		launchType _t;
+		_t.pipeNum = 1;
+		_t.pipeLoc[0] = 4;
+		_t.background = false;
+		for (int i = 0; i <= _t.pipeNum; i++)
 		{
-			t.builtIn[i] = 0;
-			t.inredirect[i] = false;
-			t.outredirect[i] = false;
+			_t.builtIn[i] = 0;
+			_t.inredirect[i] = false;
+			_t.outredirect[i] = false;
 		}
-		multiPipev(com, t, 1);
+		multiPipev(com, _t, 1);
 	}
 	else if (!strcmp(args[1], "-c"))
 	{
