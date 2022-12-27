@@ -25,10 +25,25 @@ void (*funcs[9])() = {task1, task2, task3, task4, task5, task6, task7, task8, ta
 
 void my_alarm_handler(int sig)
 {
+    static int rr_count = 0;
     if (curr_task)
     {
-        printf("curr task %s running\n", curr_task->task_name);
         curr_task->running_time++;
+        if (algorithm == RR)
+        {
+            rr_count++;
+            if (rr_count == 3)
+            {
+                printf("TIMEUP\n");
+                rr_count = 0;
+                curr_task->task_state = READY;
+                enQueue(ready_queue, curr_task);
+                contextNode *timeupContext = findContext(curr_task);
+                if (!timeupContext)
+                    fprintf(stderr, "context switch error\n");
+                swapcontext(&timeupContext->ctx, &ctx_main);
+            }
+        }
     }
 
     QNode *rNode = ready_queue->front;
@@ -64,38 +79,24 @@ void my_stp_handler(int sig)
 void task_manager_initialize(const char *inputString)
 {
     if (!strcmp(inputString, "FCFS"))
-    {
-        task_queue = createQueue();
-        waiting_queue = createQueue();
-        ready_queue = createQueue();
         algorithm = FCFS;
-    }
     else if (!strcmp(inputString, "RR"))
-    {
         algorithm = RR;
-    }
     else if (!strcmp(inputString, "PP"))
-    {
         algorithm = PP;
-    }
+
+    task_queue = createQueue();
+    waiting_queue = createQueue();
+    ready_queue = createQueue();
 
     signal(SIGTSTP, my_stp_handler);
 }
 
 void task_manager_destroy()
 {
-    switch (algorithm)
-    {
-    case FCFS:
-        detroyQueue(ready_queue, false);
-        detroyQueue(waiting_queue, false);
-        detroyQueue(task_queue, true);
-        break;
-    case RR:
-        break;
-    case PP:
-        break;
-    }
+    detroyQueue(ready_queue, false);
+    detroyQueue(waiting_queue, false);
+    detroyQueue(task_queue, true);
 }
 
 void task_sleep(int ms)
@@ -133,33 +134,32 @@ void addTask(char *taskName, char *functionName, int priority)
         enQueue(ready_queue, t);
         break;
     case RR:
+        enQueue(task_queue, t);
+        enQueue(ready_queue, t);
         break;
     case PP:
+        enQueue(task_queue, t);
+        priorityenQueue(ready_queue, t);
         break;
     }
     printf("Task %s is ready\n", t->task_name);
 }
 
+void deleteTask(Task *t)
+{
+}
+
 void printTask()
 {
-    printf(" TID|\tname|\t     state|\trunning|\twaiting|\tturnaround|\tresources|\tpriority\n");
+    printf(" TID|\tname|\t     state|\trunning|\twaiting|\tturnaround|\t  resources|\tpriority\n");
     for (int i = 0; i < 107; i++)
         printf("-");
     printf("\n");
-    switch (algorithm)
+    QNode *tmp = task_queue->front;
+    while (tmp)
     {
-    case FCFS:
-        QNode *tmp = task_queue->front;
-        while (tmp)
-        {
-            taskInfo(tmp->t);
-            tmp = tmp->next;
-        }
-        break;
-    case RR:
-        break;
-    case PP:
-        break;
+        taskInfo(tmp->t);
+        tmp = tmp->next;
     }
 }
 
@@ -188,8 +188,8 @@ void taskInfo(Task *t)
         printf("\t%10d|", t->turnaround);
     else
         printf("\t      none|");
-    char buffer[16] = "              |";
-    int pos = 14;
+    char buffer[18] = "                |";
+    int pos = 15;
     for (int i = 0; i < MAX_RESOURCE; i++)
     {
         if (t->resources[i])
@@ -198,8 +198,8 @@ void taskInfo(Task *t)
             buffer[pos--] = ' ';
         }
     }
-    if (pos == 14)
-        strcpy(buffer, "          none|");
+    if (pos == 15)
+        strcpy(buffer, "            none|");
     printf("%s", buffer);
     printf("\t%8d\n", t->priority);
 }
@@ -244,9 +244,8 @@ void *simulation(void *vargp)
             }
             swapcontext(&ctx_main, &readyContext->ctx);
             /* if task is terminated than release context & stack */
-            if (curr_task->task_state == TERMINATED)
-                deleteContext(curr_task);
-
+            // if (curr_task->task_state == TERMINATED)
+            //     deleteContext(curr_task);
             curr_task = NULL;
         }
         else
@@ -308,6 +307,7 @@ void addContext(Task *t)
 
 void deleteContext(Task *t)
 {
+    printf("DELETING CONTEXT\n");
     contextNode *pre = NULL;
     contextNode *tmp = contextList;
     while (tmp)
@@ -328,6 +328,7 @@ void deleteContext(Task *t)
 
 contextNode *findContext(Task *t)
 {
+    printf("finding context\n");
     contextNode *n = contextList;
     while (n)
     {
@@ -337,6 +338,7 @@ contextNode *findContext(Task *t)
         }
         n = n->next;
     }
+    printf("context found\n");
     return NULL;
 }
 
@@ -358,7 +360,7 @@ Task *newTask(char *taskName, char *functionName, int priority)
     return t;
 }
 
-void deleteTask(Task *t)
+void destroyTask(Task *t)
 {
     free(t->task_name);
     free(t);

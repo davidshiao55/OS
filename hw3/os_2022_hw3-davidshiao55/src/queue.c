@@ -23,7 +23,8 @@ void detroyQueue(Queue *q, bool delete)
     while (q->front)
     {
         if (delete)
-            deleteTask(q->front->t);
+            destroyTask(q->front->t);
+
         deQueue(q);
     }
     free(q);
@@ -46,6 +47,10 @@ void enQueue(struct Queue *q, Task *t)
     // Add the new node at the end of queue and change rear
     q->rear->next = temp;
     q->rear = temp;
+}
+
+void priorityenQueue(Queue *q, Task *t)
+{
 }
 
 // Function to remove a key from given queue q
