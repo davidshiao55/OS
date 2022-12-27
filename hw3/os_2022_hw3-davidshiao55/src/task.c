@@ -10,16 +10,16 @@
 #include "../include/task.h"
 #include "../include/function.h"
 #include "../include/queue.h"
-#include "../include/heap.h"
 
 Queue *ready_queue;
 Queue *task_queue;
 Queue *waiting_queue;
-int algorithm;
-int taskCount = 0;
-bool sim = false;
+
 Task *curr_task = NULL;
 ucontext_t ctx_main;
+int taskCount = 0;
+int algorithm;
+bool sim = false;
 void (*funcs[9])() = {task1, task2, task3, task4, task5, task6, task7, task8, task9};
 
 void my_alarm_handler(int sig)
@@ -51,15 +51,36 @@ void my_alarm_handler(int sig)
     QNode *wNode = waiting_queue->front;
     while (wNode)
     {
-        wNode->t->waiting_time++;
-        wNode->t->sleep_time--;
-        if (wNode->t->sleep_time <= 0)
+        Task *t = wNode->t;
+        t->waiting_time++;
+        if (t->sleep_time > 0)
         {
-            // printf("waking up task %s\n", wNode->t->task_name);
-            wNode->t->task_state = READY;
-            enQueue(ready_queue, wNode->t);
-            deleteQueue(waiting_queue, wNode->t);
-            break;
+            t->sleep_time--;
+            if (t->sleep_time <= 0)
+            {
+                printf("waking up task %s\n", wNode->t->task_name);
+                t->task_state = READY;
+                if (algorithm == PP)
+                    priorityenQueue(ready_queue, t);
+                else
+                    enQueue(ready_queue, t);
+                deleteQueue(waiting_queue, t);
+                break;
+            }
+        }
+        else if (t->waiting_resources)
+        {
+            if (check_resources(t->waiting_resources_count, t->waiting_resources))
+            {
+                printf("waking up task %s\n", wNode->t->task_name);
+                t->task_state = READY;
+                if (algorithm == PP)
+                    priorityenQueue(ready_queue, t);
+                else
+                    enQueue(ready_queue, t);
+                deleteQueue(waiting_queue, t);
+                break;
+            }
         }
         wNode = wNode->next;
     }
@@ -98,6 +119,7 @@ void startSimulation()
 {
     pthread_t tid;
     sim = true;
+    printf("Start simulation.\n");
     pthread_create(&tid, NULL, simulation, NULL);
 }
 
@@ -142,13 +164,14 @@ void *simulation(void *vargp)
             else
             {
                 printf("CPU idle\n");
-                while (waiting_queue->front)
+                while (waiting_queue->front && !ready_queue->front)
                 {
+                    // printf("IDLE\n");
                 }
             }
         }
     }
-    printf("SIMULATION END\n");
+    printf("Simulation over.\n");
 
     // clear timer
     tv.it_value.tv_usec = 0;
@@ -159,6 +182,18 @@ void *simulation(void *vargp)
         exit(EXIT_FAILURE);
     }
     pthread_exit(NULL);
+}
+
+void task_wait_resource(int count, int *resources)
+{
+    printf("Task %s is waiting resource.\n", curr_task->task_name);
+    curr_task->waiting_resources_count = count;
+    curr_task->waiting_resources = (int *)malloc(sizeof(int) * count);
+    for (int j = 0; j < count; j++)
+        curr_task->waiting_resources[j] = resources[j];
+    curr_task->task_state = WAITING;
+    enQueue(waiting_queue, curr_task);
+    swapcontext(&(curr_task->task_context->ctx), &ctx_main);
 }
 
 void task_sleep(int ms)
@@ -196,11 +231,34 @@ void addTask(char *taskName, char *functionName, int priority)
         priorityenQueue(ready_queue, t);
         break;
     }
-    printf("Task %s is ready\n", t->task_name);
+    printf("Task %s is ready.\n", t->task_name);
 }
 
-void deleteTask(Task *t)
+void deleteTask(char *taskName)
 {
+    QNode *tmp = task_queue->front;
+    while (tmp)
+    {
+        if (!strcmp(tmp->t->task_name, taskName))
+            break;
+        tmp = tmp->next;
+    }
+    if (!tmp)
+        return;
+    if (tmp->t->task_state == RUNNING)
+    {
+        task_exit();
+    }
+    else if (tmp->t->task_state == WAITING)
+    {
+        tmp->t->task_state = TERMINATED;
+        deleteQueue(waiting_queue, tmp->t);
+    }
+    else if (tmp->t->task_state == READY)
+    {
+        tmp->t->task_state = TERMINATED;
+        deleteQueue(ready_queue, tmp->t);
+    }
 }
 
 void printTask()
@@ -287,12 +345,14 @@ Task *newTask(char *taskName, char *functionName, int priority)
     t->priority = priority;
     t->running_time = 0;
     t->waiting_time = 0;
-    t->sleep_time = 0;
     t->turnaround = 0;
     t->task_state = READY;
     t->task_context = newContext(t->function);
     for (int i = 0; i < MAX_RESOURCE; i++)
         t->resources[i] = false;
+    t->sleep_time = 0;
+    t->waiting_resources = NULL;
+    t->waiting_resources_count = 0;
     return t;
 }
 
@@ -300,6 +360,8 @@ void destroyTask(Task *t)
 {
     if (t->task_context)
         free(t->task_context);
+    if (t->waiting_resources)
+        free(t->waiting_resources);
     free(t->task_name);
     free(t);
 }

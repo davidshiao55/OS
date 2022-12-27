@@ -51,6 +51,35 @@ void enQueue(struct Queue *q, Task *t)
 
 void priorityenQueue(Queue *q, Task *t)
 {
+    QNode *temp = newNode(t);
+
+    if (q->front == NULL)
+    {
+        q->front = q->rear = temp;
+        return;
+    }
+    QNode *prev = NULL;
+    QNode *curr = q->front;
+    while (curr && t->priority > curr->t->priority)
+    {
+        prev = curr;
+        curr = curr->next;
+    }
+    if (curr == q->front)
+    {
+        temp->next = q->front;
+        q->front = temp;
+    }
+    else if (curr == NULL)
+    {
+        q->rear->next = temp;
+        q->rear = temp;
+    }
+    else
+    {
+        prev->next = temp;
+        temp->next = curr;
+    }
 }
 
 // Function to remove a key from given queue q

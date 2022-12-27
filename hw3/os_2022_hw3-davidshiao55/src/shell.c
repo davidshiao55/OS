@@ -9,6 +9,9 @@
 #include "../include/command.h"
 #include "../include/builtin.h"
 
+char *history[MAX_RECORD_NUM];
+int history_count;
+
 int execute(struct pipes *p)
 {
 	for (int i = 0; i < num_builtins(); ++i)

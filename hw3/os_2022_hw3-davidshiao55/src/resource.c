@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "../include/resource.h"
 #include "../include/task.h"
 
@@ -18,8 +19,7 @@ void get_resources(int count, int *resources)
             break;
         else
         {
-            printf("Task %s is waiting resource.\n", curr_task->task_name);
-            task_sleep(30);
+            task_wait_resource(count, resources);
         }
     }
     for (i = 0; i < count; i++)
@@ -27,6 +27,12 @@ void get_resources(int count, int *resources)
         printf("Task %s gets resource %d.\n", curr_task->task_name, resources[i]);
         curr_task->resources[resources[i]] = true;
         resourse_available[resources[i]] = false;
+    }
+    if (curr_task->waiting_resources)
+    {
+        free(curr_task->waiting_resources);
+        curr_task->waiting_resources = NULL;
+        curr_task->waiting_resources_count = 0;
     }
 }
 
@@ -38,4 +44,14 @@ void release_resources(int count, int *resources)
         curr_task->resources[resources[i]] = false;
         resourse_available[resources[i]] = true;
     }
+}
+
+bool check_resources(int count, int *resources)
+{
+    for (int i = 0; i < count; i++)
+    {
+        if (!resourse_available[resources[i]])
+            return false;
+    }
+    return true;
 }

@@ -196,7 +196,7 @@ int add(char **args)
 
 int del(char **args)
 {
-
+	deleteTask(args[1]);
 	return 1;
 }
 
