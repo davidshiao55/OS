@@ -24,6 +24,8 @@ void (*funcs[9])() = {task1, task2, task3, task4, task5, task6, task7, task8, ta
 
 void my_alarm_handler(int sig)
 {
+    if (!sim)
+        return;
     static int rr_count = 0;
     if (curr_task)
     {
@@ -89,7 +91,14 @@ void my_alarm_handler(int sig)
 void my_stp_handler(int sig)
 {
     // stop simulation
-    sim = false;
+    if (sim)
+    {
+        sim = false;
+        if (curr_task)
+        {
+            swapcontext(&(curr_task->task_context->ctx), &ctx_main);
+        }
+    }
 }
 
 void task_manager_initialize(const char *inputString)
@@ -121,6 +130,8 @@ void startSimulation()
     sim = true;
     printf("Start simulation.\n");
     pthread_create(&tid, NULL, simulation, NULL);
+    pthread_join(tid, NULL);
+    printf("HI\n");
 }
 
 void *simulation(void *vargp)
@@ -164,9 +175,8 @@ void *simulation(void *vargp)
             else
             {
                 printf("CPU idle\n");
-                while (waiting_queue->front && !ready_queue->front)
+                while (waiting_queue->front && !ready_queue->front && sim)
                 {
-                    // printf("IDLE\n");
                 }
             }
         }
@@ -181,7 +191,7 @@ void *simulation(void *vargp)
         perror("settimer error.\n");
         exit(EXIT_FAILURE);
     }
-    pthread_exit(NULL);
+    return NULL;
 }
 
 void task_wait_resource(int count, int *resources)
