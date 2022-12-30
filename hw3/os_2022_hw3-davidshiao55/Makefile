@@ -1,6 +1,6 @@
 TARGET 	= scheduler_simulator
 CC     	= gcc
-FLAGS  	= -Wall -pthread
+FLAGS  	= -Wall -pthread -g
 OBJ    	= builtin.o command.o shell.o function.o resource.o task.o queue.o
 INCLUDE = ./include/
 SRC		= ./src/

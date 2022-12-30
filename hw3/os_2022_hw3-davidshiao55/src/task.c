@@ -24,8 +24,6 @@ void (*funcs[9])() = {task1, task2, task3, task4, task5, task6, task7, task8, ta
 
 void my_alarm_handler(int sig)
 {
-    if (!sim)
-        return;
     static int rr_count = 0;
     if (curr_task)
     {
@@ -42,6 +40,8 @@ void my_alarm_handler(int sig)
             }
         }
     }
+    else
+        rr_count = 0;
 
     QNode *rNode = ready_queue->front;
     while (rNode)
@@ -60,7 +60,6 @@ void my_alarm_handler(int sig)
             t->sleep_time--;
             if (t->sleep_time <= 0)
             {
-                printf("waking up task %s\n", wNode->t->task_name);
                 t->task_state = READY;
                 if (algorithm == PP)
                     priorityenQueue(ready_queue, t);
@@ -74,7 +73,6 @@ void my_alarm_handler(int sig)
         {
             if (check_resources(t->waiting_resources_count, t->waiting_resources))
             {
-                printf("waking up task %s\n", wNode->t->task_name);
                 t->task_state = READY;
                 if (algorithm == PP)
                     priorityenQueue(ready_queue, t);
@@ -94,8 +92,11 @@ void my_stp_handler(int sig)
     if (sim)
     {
         sim = false;
+        /* syncronous stop */
         if (curr_task)
         {
+            curr_task->task_state = READY;
+            enQueue(ready_queue, curr_task);
             swapcontext(&(curr_task->task_context->ctx), &ctx_main);
         }
     }
@@ -122,20 +123,12 @@ void task_manager_destroy()
     detroyQueue(ready_queue, false);
     detroyQueue(waiting_queue, false);
     detroyQueue(task_queue, true);
+    signal(SIGTSTP, my_stp_handler);
 }
 
-void startSimulation()
+void simulation()
 {
-    pthread_t tid;
     sim = true;
-    printf("Start simulation.\n");
-    pthread_create(&tid, NULL, simulation, NULL);
-    pthread_join(tid, NULL);
-    printf("HI\n");
-}
-
-void *simulation(void *vargp)
-{
     /* set timer */
     struct itimerval tv;
     tv.it_interval.tv_usec = 10000;
@@ -150,7 +143,7 @@ void *simulation(void *vargp)
     }
 
     signal(SIGALRM, my_alarm_handler);
-
+    printf("Simulation start.\n");
     while (sim)
     {
         if (ready_queue->front)
@@ -161,8 +154,8 @@ void *simulation(void *vargp)
             printf("Task %s is running.\n", curr_task->task_name);
             swapcontext(&ctx_main, &(curr_task->task_context->ctx));
             /* if task is terminated than release context & stack : seg fault*/
-            // if (curr_task->task_state == TERMINATED)
-            //     deleteContext(curr_task);
+            if (curr_task->task_state == TERMINATED)
+                deleteContext(curr_task);
             curr_task = NULL;
         }
         else
@@ -181,8 +174,6 @@ void *simulation(void *vargp)
             }
         }
     }
-    printf("Simulation over.\n");
-
     // clear timer
     tv.it_value.tv_usec = 0;
     tv.it_value.tv_sec = 0;
@@ -191,7 +182,8 @@ void *simulation(void *vargp)
         perror("settimer error.\n");
         exit(EXIT_FAILURE);
     }
-    return NULL;
+
+    printf("Simulation over.\n");
 }
 
 void task_wait_resource(int count, int *resources)
@@ -340,7 +332,6 @@ Task_context *newContext(int f)
 
 void deleteContext(Task *t)
 {
-    printf("DELETE task context %s\n", t->task_name);
     free(t->task_context);
     t->task_context = NULL;
 }

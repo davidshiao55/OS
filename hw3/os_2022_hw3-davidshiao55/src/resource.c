@@ -8,19 +8,9 @@ bool resourse_available[MAX_RESOURCE] = {true, true, true, true, true, true, tru
 void get_resources(int count, int *resources)
 {
     int i = 0;
-    while (1)
+    while (!check_resources(count, resources))
     {
-        for (i = 0; i < count; i++)
-        {
-            if (!resourse_available[resources[i]])
-                break;
-        }
-        if (i == count)
-            break;
-        else
-        {
-            task_wait_resource(count, resources);
-        }
+        task_wait_resource(count, resources);
     }
     for (i = 0; i < count; i++)
     {

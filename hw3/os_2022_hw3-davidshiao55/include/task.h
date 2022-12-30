@@ -49,8 +49,7 @@ void deleteTask(char *taskName);
 void destroyTask(Task *t);
 void printTask();
 void taskInfo(Task *t);
-void startSimulation();
-void *simulation(void *vargp);
+void simulation();
 
 Task_context *newContext(int f);
 void deleteContext(Task *t);

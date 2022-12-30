@@ -208,7 +208,7 @@ int ps(char **args)
 
 int start(char **args)
 {
-	startSimulation();
+	simulation();
 	return 1;
 }
 
